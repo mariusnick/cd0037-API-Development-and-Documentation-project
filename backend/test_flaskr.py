@@ -1,4 +1,5 @@
 import os
+# from tkinter.messagebox import NO
 import unittest
 import json
 from flask_sqlalchemy import SQLAlchemy
@@ -46,29 +47,8 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(len(data["categories"]))
     
     
-#   "questions": [
-#     {
-#       "id": 1,
-#       "question": "This is a question",
-#       "answer": "This is an answer",
-#       "difficulty": 5,
-#       "category": 2
-#     }
-#   ],
-#   "totalQuestions": 100,
-#   "categories": {
-#     "1": "Science",
-#     "2": "Art",
-#     "3": "Geography",
-#     "4": "History",
-#     "5": "Entertainment",
-#     "6": "Sports"
-#   },
-#   "currentCategory": "History"
-# }
-    
     def test_get_paginated_question(self):
-        res = self.client().get("/questions")
+        res = self.client().get("/questions?page=1")
         data = json.loads(res.data)
 
         self.assertEqual(res.status_code, 200)
@@ -76,15 +56,33 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data["totalQuestions"])
         self.assertTrue(len(data["questions"]))
         
-    # def test_delete_question(self):
+    def test_fail_paginated_question(self):
+        res = self.client().get("/questions?page=1501")
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data["success"], False)
         
-    #     res = self.client().delete("/questions/4")
-    #     data = json.loads(res.data)
-    #     question = Question.query.filter(Question.id == 4).one_or_none()
-    #     self.assertEqual(res.status_code, 200)
-    #     self.assertEqual(data["success"], True)
-    #     self.assertEqual(data["deleted"], 4)        
-    #     self.assertEqual(question, None)
+        
+    def test_delete_question(self):
+        
+        res = self.client().delete("/questions/4")
+        data = json.loads(res.data)
+        question = Question.query.filter(Question.id == 4).one_or_none()
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data["success"], True)
+        self.assertEqual(data["deleted"], 4)        
+        self.assertEqual(question, None)
+    
+    def test_fail_delete_question(self):
+        
+        res = self.client().delete("/questions/1000")
+        data = json.loads(res.data)
+        question = Question.query.filter(Question.id == 10000).one_or_none()
+        if question is None:
+            self.assertEqual(res.status_code, 422)
+            self.assertEqual(data["success"], False)
+        
     
     def test_create_new_question(self):
         res = self.client().post("/questions", json=self.new_question)
@@ -93,6 +91,22 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(data["success"], True)
         self.assertTrue(data["created"])
+        
+    def test_create_question_with_no_data(self):
+        """Test for ensuring data with empty fields are not processed."""
+        request_data = {
+            'question': '',
+            'answer': '',
+            'difficulty': '',
+            'category':'',
+        }
+
+        response = self.client().post('/questions', json=request_data)
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'unprocessable')
         
     def test_post_questions_search_with_results(self):
         res = self.client().post("/questions", json={"searchTerm": "Tom Hanks"})
@@ -112,6 +126,18 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data["success"], True)
         self.assertFalse(data["totalQuestions"])
         self.assertEqual(len(data["questions"]), 0)
+        
+    def test_fail_search_term_response(self):
+           
+        request_data = {'searchTerm': ''}
+
+        response = self.client().post('/questions', json=request_data)
+        data = json.loads(response.data) 
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'unprocessable')
+        
+        
     
     def test_get_category_questions(self):
         res = self.client().get("/categories/1/questions")
@@ -133,11 +159,13 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data["success"], True)
         self.assertTrue(data["question"])
         
-       
-       
-       
+    def test_fail_post_quizz(self):
+        res = self.client().post("/quizzes", json={ })
+        data = json.loads(res.data)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data["success"], False)
         
-    
+         
 
 # Make the tests conveniently executable
 if __name__ == "__main__":
